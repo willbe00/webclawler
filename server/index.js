@@ -312,27 +312,27 @@ app.get('/api/download', async (req, res) => {
     res.setHeader('X-Content-Length', size);
     res.setHeader('Access-Control-Expose-Headers', 'X-Content-Length, X-Downloaded-Bytes');
 
-    // Стримим кусками по 256 байт — виден реальный прогресс
-    const chunkSize = 256;
+    // Стримим построчно — кириллица не режется посередине символа
+    const lines = body.split('\n');
     const readable = new Readable({ read() {} });
     res.setHeader('Transfer-Encoding', 'chunked');
 
-    let offset = 0;
+    let lineIndex = 0;
     let downloaded = 0;
-    const buf = Buffer.from(body, 'utf8');
 
     const interval = setInterval(() => {
-      if (offset >= buf.length) {
+      if (lineIndex >= lines.length) {
         clearInterval(interval);
         readable.push(null);
         return;
       }
-      const chunk = buf.slice(offset, offset + chunkSize);
-      offset += chunkSize;
+      const line = lines[lineIndex] + '\n';
+      lineIndex++;
+      const chunk = Buffer.from(line, 'utf8');
       downloaded += chunk.length;
       res.setHeader('X-Downloaded-Bytes', downloaded);
       readable.push(chunk);
-    }, 50);
+    }, 40);
 
     readable.pipe(res);
 
