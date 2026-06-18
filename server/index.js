@@ -312,31 +312,29 @@ app.get('/api/download', async (req, res) => {
     res.setHeader('X-Content-Length', size);
     res.setHeader('Access-Control-Expose-Headers', 'X-Content-Length, X-Downloaded-Bytes');
 
-    // Стримим построчно — кириллица не режется посередине символа
+    // Стримим построчно прямо в res
     const lines = body.split('\n');
-    const readable = new Readable({ read() {} });
-    res.setHeader('Transfer-Encoding', 'chunked');
-
     let lineIndex = 0;
     let downloaded = 0;
 
     const interval = setInterval(() => {
       if (lineIndex >= lines.length) {
         clearInterval(interval);
-        readable.push(null);
+        res.end();
         return;
       }
-      const line = lines[lineIndex] + '\n';
+      const line = lines[lineIndex] + (lineIndex < lines.length - 1 ? '\n' : '');
       lineIndex++;
       const chunk = Buffer.from(line, 'utf8');
       downloaded += chunk.length;
       res.setHeader('X-Downloaded-Bytes', downloaded);
-      readable.push(chunk);
+      res.write(chunk);
     }, 40);
 
-    readable.pipe(res);
-
-    req.on('close', () => clearInterval(interval));
+    req.on('close', () => {
+      clearInterval(interval);
+      if (!res.writableEnded) res.end();
+    });
     return;
   }
 
